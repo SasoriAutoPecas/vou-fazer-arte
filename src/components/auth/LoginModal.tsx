@@ -14,16 +14,11 @@ interface LoginModalProps {
 const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
   const { login } = useApp();
   const [isLogin, setIsLogin] = useState(true);
-  const [userType, setUserType] = useState<'donor' | 'institution'>('donor');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    name: '',
-    phone: '',
-    cpf: '',
-    cnpj: ''
+    password: ''
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,7 +27,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
 
     try {
       if (isLogin) {
-        const success = await login(formData.email, formData.password, userType);
+        const success = await login(formData.email, formData.password);
         if (success) {
           await Swal.fire({
             icon: 'success',
@@ -50,15 +45,14 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
           });
         }
       } else {
-        // Simulate registration
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Redirecionar para página de cadastro completo
         await Swal.fire({
-          icon: 'success',
-          title: 'Cadastro realizado com sucesso!',
-          text: 'Sua conta foi criada. Faça login para continuar.',
+          icon: 'info',
+          title: 'Cadastro completo necessário',
+          text: 'Para se cadastrar, você precisa preencher informações adicionais. Redirecionando...',
           confirmButtonColor: '#2E7D32'
         });
-        setIsLogin(true);
+        // Aqui você pode implementar a navegação para uma página de cadastro completo
       }
     } catch (error) {
       await Swal.fire({
@@ -87,83 +81,6 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
       size="md"
     >
       <form onSubmit={handleSubmit} className="space-y-4">
-        {/* User Type Toggle */}
-        {!isLogin && (
-          <div className="flex p-1 bg-gray-100 rounded-lg">
-            <button
-              type="button"
-              onClick={() => setUserType('donor')}
-              className={`
-                flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors
-                ${userType === 'donor'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-                }
-              `}
-            >
-              <User className="w-4 h-4 inline mr-2" />
-              Doador
-            </button>
-            <button
-              type="button"
-              onClick={() => setUserType('institution')}
-              className={`
-                flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors
-                ${userType === 'institution'
-                  ? 'bg-white text-green-600 shadow-sm'
-                  : 'text-gray-500 hover:text-gray-700'
-                }
-              `}
-            >
-              <Building className="w-4 h-4 inline mr-2" />
-              Instituição
-            </button>
-          </div>
-        )}
-
-        {/* Registration Fields */}
-        {!isLogin && (
-          <>
-            <Input
-              label={userType === 'donor' ? 'Nome Completo' : 'Nome da Instituição'}
-              name="name"
-              value={formData.name}
-              onChange={handleInputChange}
-              required
-            />
-            
-            <Input
-              label="Telefone"
-              name="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={handleInputChange}
-              placeholder="(11) 99999-9999"
-              required
-            />
-
-            {userType === 'donor' ? (
-              <Input
-                label="CPF"
-                name="cpf"
-                value={formData.cpf}
-                onChange={handleInputChange}
-                placeholder="000.000.000-00"
-                required
-              />
-            ) : (
-              <Input
-                label="CNPJ"
-                name="cnpj"
-                value={formData.cnpj}
-                onChange={handleInputChange}
-                placeholder="00.000.000/0000-00"
-                required
-              />
-            )}
-          </>
-        )}
-
         {/* Email */}
         <Input
           label="E-mail"
@@ -201,9 +118,9 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose }) => {
         {isLogin && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
             <p className="text-sm text-blue-800">
-              <strong>Para testar:</strong><br />
-              Email: donor@test.com<br />
-              Senha: 123456
+              <strong>Sistema em desenvolvimento:</strong><br />
+              Para testar, você precisa se conectar ao Supabase primeiro.<br />
+              Clique no botão "Connect to Supabase" no canto superior direito.
             </p>
           </div>
         )}

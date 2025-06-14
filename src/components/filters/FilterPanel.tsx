@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
 import { Filter, X, Star, MapPin, Clock, Building } from 'lucide-react';
-import { categories } from '../../data/mockData';
 import Button from '../ui/Button';
-import Card from '../ui/Card';
 
 interface FilterOptions {
   categories: string[];
@@ -17,13 +15,15 @@ interface FilterPanelProps {
   onClose: () => void;
   filters: FilterOptions;
   onFiltersChange: (filters: FilterOptions) => void;
+  categories: any[];
 }
 
 const FilterPanel: React.FC<FilterPanelProps> = ({
   isOpen,
   onClose,
   filters,
-  onFiltersChange
+  onFiltersChange,
+  categories
 }) => {
   const [localFilters, setLocalFilters] = useState<FilterOptions>(filters);
 

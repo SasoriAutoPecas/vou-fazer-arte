@@ -1,9 +1,8 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { useApp } from '../../context/AppContext';
-import { institutions } from '../../data/mockData';
-import { Institution } from '../../types';
+import { institutionService } from '../../services/institutionService';
 import { MapPin, Star, Clock, Phone } from 'lucide-react';
 import Button from '../ui/Button';
 
@@ -40,8 +39,14 @@ const userIcon = new L.Icon({
 });
 
 interface MapComponentProps {
-  filteredInstitutions: Institution[];
-  onInstitutionSelect: (institution: Institution) => void;
+  filters?: {
+    categories?: string[];
+    institutionTypes?: string[];
+    minRating?: number;
+    maxDistance?: number;
+    openNow?: boolean;
+  };
+  onInstitutionSelect: (institution: any) => void;
 }
 
 const LocationMarker: React.FC = () => {
@@ -87,13 +92,34 @@ const LocationMarker: React.FC = () => {
 };
 
 const MapComponent: React.FC<MapComponentProps> = ({
-  filteredInstitutions,
+  filters,
   onInstitutionSelect
 }) => {
   const { userLocation } = useApp();
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const mapRef = useRef<L.Map | null>(null);
 
   const center: [number, number] = userLocation || [-23.5505, -46.6333];
+
+  useEffect(() => {
+    const loadInstitutions = async () => {
+      try {
+        setLoading(true);
+        const data = await institutionService.getInstitutions({
+          ...filters,
+          userLocation
+        });
+        setInstitutions(data);
+      } catch (error) {
+        console.error('Erro ao carregar instituições:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadInstitutions();
+  }, [filters, userLocation]);
 
   const getInstitutionTypeLabel = (type: string) => {
     const types = {
@@ -105,6 +131,17 @@ const MapComponent: React.FC<MapComponentProps> = ({
     };
     return types[type as keyof typeof types] || type;
   };
+
+  if (loading) {
+    return (
+      <div className="w-full h-full flex items-center justify-center bg-gray-100">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando mapa...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full">
@@ -122,63 +159,68 @@ const MapComponent: React.FC<MapComponentProps> = ({
         
         <LocationMarker />
         
-        {filteredInstitutions.map((institution) => (
-          <Marker
-            key={institution.id}
-            position={institution.coordinates}
-            icon={institutionIcon}
-          >
-            <Popup maxWidth={300} className="custom-popup">
-              <div className="p-3 min-w-[280px]">
-                <div className="flex items-start space-x-3 mb-3">
-                  <img
-                    src={institution.avatar}
-                    alt={institution.name}
-                    className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                      {institution.name}
-                    </h3>
-                    <p className="text-xs text-green-600 mt-1">
-                      {getInstitutionTypeLabel(institution.type)}
-                    </p>
+        {institutions.map((institution) => {
+          const address = institution.addresses[0];
+          if (!address?.latitude || !address?.longitude) return null;
+
+          return (
+            <Marker
+              key={institution.id}
+              position={[address.latitude, address.longitude]}
+              icon={institutionIcon}
+            >
+              <Popup maxWidth={300} className="custom-popup">
+                <div className="p-3 min-w-[280px]">
+                  <div className="flex items-start space-x-3 mb-3">
+                    <img
+                      src={institution.users.avatar_url || 'https://images.pexels.com/photos/6646918/pexels-photo-6646918.jpeg?auto=compress&cs=tinysrgb&w=100'}
+                      alt={institution.users.name}
+                      className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-sm leading-tight">
+                        {institution.users.name}
+                      </h3>
+                      <p className="text-xs text-green-600 mt-1">
+                        {getInstitutionTypeLabel(institution.institution_type)}
+                      </p>
+                    </div>
                   </div>
+
+                  <div className="space-y-2 mb-3">
+                    <div className="flex items-center space-x-2 text-xs">
+                      <Star className="w-3 h-3 text-yellow-500 fill-current" />
+                      <span className="font-medium">{institution.rating || 0}</span>
+                      <span className="text-gray-500">({institution.total_ratings || 0} avaliações)</span>
+                    </div>
+
+                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                      <MapPin className="w-3 h-3" />
+                      <span>{address.neighborhood}, {address.city}</span>
+                    </div>
+
+                    <div className="flex items-center space-x-2 text-xs text-gray-600">
+                      <Phone className="w-3 h-3" />
+                      <span>{institution.users.phone}</span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-700 mb-3 line-clamp-2">
+                    {institution.description}
+                  </p>
+
+                  <Button
+                    size="sm"
+                    onClick={() => onInstitutionSelect(institution)}
+                    fullWidth
+                  >
+                    Ver Mais
+                  </Button>
                 </div>
-
-                <div className="space-y-2 mb-3">
-                  <div className="flex items-center space-x-2 text-xs">
-                    <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                    <span className="font-medium">{institution.rating}</span>
-                    <span className="text-gray-500">({institution.totalRatings} avaliações)</span>
-                  </div>
-
-                  <div className="flex items-center space-x-2 text-xs text-gray-600">
-                    <MapPin className="w-3 h-3" />
-                    <span>{institution.address.neighborhood}, {institution.address.city}</span>
-                  </div>
-
-                  <div className="flex items-center space-x-2 text-xs text-gray-600">
-                    <Phone className="w-3 h-3" />
-                    <span>{institution.phone}</span>
-                  </div>
-                </div>
-
-                <p className="text-xs text-gray-700 mb-3 line-clamp-2">
-                  {institution.description}
-                </p>
-
-                <Button
-                  size="sm"
-                  onClick={() => onInstitutionSelect(institution)}
-                  fullWidth
-                >
-                  Ver Mais
-                </Button>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
+              </Popup>
+            </Marker>
+          );
+        })}
       </MapContainer>
     </div>
   );

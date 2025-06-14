@@ -1,18 +1,22 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { User, Institution, Donation } from '../types';
-import { mockUser, mockDonations } from '../data/mockData';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { authService } from '../services/authService';
+import { Database } from '../lib/database.types';
+
+type User = Database['public']['Tables']['users']['Row'] & {
+  addresses?: Database['public']['Tables']['addresses']['Row'][];
+  institutions?: Database['public']['Tables']['institutions']['Row'][];
+};
 
 interface AppContextType {
   user: User | null;
   isAuthenticated: boolean;
+  loading: boolean;
   userLocation: [number, number] | null;
-  selectedInstitution: Institution | null;
-  donations: Donation[];
-  login: (email: string, password: string, type: 'donor' | 'institution') => Promise<boolean>;
-  logout: () => void;
+  selectedInstitution: any | null;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
   setUserLocation: (location: [number, number]) => void;
-  setSelectedInstitution: (institution: Institution | null) => void;
-  addDonation: (donation: Omit<Donation, 'id' | 'createdAt'>) => void;
+  setSelectedInstitution: (institution: any | null) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -31,38 +35,58 @@ interface AppProviderProps {
 
 export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   const [userLocation, setUserLocationState] = useState<[number, number] | null>(null);
-  const [selectedInstitution, setSelectedInstitution] = useState<Institution | null>(null);
-  const [donations, setDonations] = useState<Donation[]>(mockDonations);
+  const [selectedInstitution, setSelectedInstitution] = useState<any | null>(null);
 
-  const login = async (email: string, password: string, type: 'donor' | 'institution'): Promise<boolean> => {
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    if (email === 'donor@test.com' && password === '123456') {
-      setUser(mockUser);
+  useEffect(() => {
+    // Verificar se há usuário logado
+    const initializeAuth = async () => {
+      try {
+        const userData = await authService.getCurrentUser();
+        setUser(userData);
+      } catch (error) {
+        console.error('Erro ao verificar autenticação:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    initializeAuth();
+
+    // Escutar mudanças no estado de autenticação
+    const { data: { subscription } } = authService.onAuthStateChange((userData) => {
+      setUser(userData);
+      setLoading(false);
+    });
+
+    return () => {
+      subscription?.unsubscribe();
+    };
+  }, []);
+
+  const login = async (email: string, password: string): Promise<boolean> => {
+    try {
+      await authService.signIn(email, password);
       return true;
+    } catch (error) {
+      console.error('Erro no login:', error);
+      return false;
     }
-    
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
-    setSelectedInstitution(null);
+  const logout = async () => {
+    try {
+      await authService.signOut();
+      setUser(null);
+      setSelectedInstitution(null);
+    } catch (error) {
+      console.error('Erro no logout:', error);
+    }
   };
 
   const setUserLocation = (location: [number, number]) => {
     setUserLocationState(location);
-  };
-
-  const addDonation = (donation: Omit<Donation, 'id' | 'createdAt'>) => {
-    const newDonation: Donation = {
-      ...donation,
-      id: Date.now().toString(),
-      createdAt: new Date()
-    };
-    setDonations(prev => [newDonation, ...prev]);
   };
 
   return (
@@ -70,14 +94,13 @@ export const AppProvider: React.FC<AppProviderProps> = ({ children }) => {
       value={{
         user,
         isAuthenticated: !!user,
+        loading,
         userLocation,
         selectedInstitution,
-        donations,
         login,
         logout,
         setUserLocation,
-        setSelectedInstitution,
-        addDonation
+        setSelectedInstitution
       }}
     >
       {children}

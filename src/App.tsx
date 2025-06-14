@@ -1,8 +1,8 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Filter, Search, Navigation } from 'lucide-react';
 import { useApp } from './context/AppContext';
-import { institutions } from './data/mockData';
-import { Institution } from './types';
+import { institutionService } from './services/institutionService';
+import { categoryService } from './services/categoryService';
 import Header from './components/layout/Header';
 import MapComponent from './components/map/MapComponent';
 import FilterPanel from './components/filters/FilterPanel';
@@ -22,11 +22,14 @@ interface FilterOptions {
 }
 
 function App() {
-  const { isAuthenticated, selectedInstitution, setSelectedInstitution, setUserLocation } = useApp();
+  const { isAuthenticated, selectedInstitution, setSelectedInstitution, setUserLocation, loading: authLoading } = useApp();
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [institutions, setInstitutions] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<FilterOptions>({
     categories: [],
     institutionTypes: [],
@@ -44,52 +47,81 @@ function App() {
     }
   }, [geolocation.coordinates, setUserLocation]);
 
+  // Load initial data
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        setLoading(true);
+        const [institutionsData, categoriesData] = await Promise.all([
+          institutionService.getInstitutions(),
+          categoryService.getCategories()
+        ]);
+        setInstitutions(institutionsData);
+        setCategories(categoriesData);
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      loadData();
+    }
+  }, [authLoading]);
+
   const filteredInstitutions = useMemo(() => {
     let filtered = institutions;
 
     // Search filter
     if (searchQuery) {
       filtered = filtered.filter(institution =>
-        institution.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institution.address.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institution.address.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
+        institution.users.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        institution.addresses[0]?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        institution.addresses[0]?.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     // Category filter
     if (filters.categories.length > 0) {
       filtered = filtered.filter(institution =>
-        institution.acceptedCategories.some(cat => filters.categories.includes(cat))
+        institution.institution_categories.some((ic: any) => 
+          filters.categories.includes(ic.categories.id)
+        )
       );
     }
 
     // Institution type filter
     if (filters.institutionTypes.length > 0) {
       filtered = filtered.filter(institution =>
-        filters.institutionTypes.includes(institution.type)
+        filters.institutionTypes.includes(institution.institution_type)
       );
     }
 
     // Rating filter
     if (filters.minRating > 0) {
       filtered = filtered.filter(institution =>
-        institution.rating >= filters.minRating
-      );
-    }
-
-    // Open now filter (simplified - would need actual time checking in real implementation)
-    if (filters.openNow) {
-      filtered = filtered.filter(institution =>
-        !institution.workingHours.find(wh => wh.day === 'Segunda')?.closed
+        (institution.rating || 0) >= filters.minRating
       );
     }
 
     return filtered;
-  }, [searchQuery, filters]);
+  }, [institutions, searchQuery, filters]);
 
-  const handleInstitutionSelect = (institution: Institution) => {
+  const handleInstitutionSelect = (institution: any) => {
     setSelectedInstitution(institution);
   };
+
+  if (authLoading || loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando sistema...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isAuthenticated && showDashboard) {
     return (
@@ -176,29 +208,31 @@ function App() {
                 >
                   <div className="flex items-start space-x-3">
                     <img
-                      src={institution.avatar}
-                      alt={institution.name}
+                      src={institution.users.avatar_url || 'https://images.pexels.com/photos/6646918/pexels-photo-6646918.jpeg?auto=compress&cs=tinysrgb&w=100'}
+                      alt={institution.users.name}
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-gray-900 truncate">
-                        {institution.name}
+                        {institution.users.name}
                       </h3>
                       <p className="text-sm text-green-600 mb-1">
-                        {institution.type === 'ong' ? 'ONG' : 
-                         institution.type === 'church' ? 'Igreja' :
-                         institution.type === 'social_project' ? 'Projeto Social' :
-                         institution.type}
+                        {institution.institution_type === 'ong' ? 'ONG' : 
+                         institution.institution_type === 'church' ? 'Igreja' :
+                         institution.institution_type === 'social_project' ? 'Projeto Social' :
+                         institution.institution_type === 'hospital' ? 'Hospital' :
+                         institution.institution_type === 'school' ? 'Escola' :
+                         institution.institution_type}
                       </p>
                       <div className="flex items-center space-x-2 mb-2">
                         <div className="flex items-center">
                           <span className="text-sm font-medium text-gray-700">
-                            {institution.rating}
+                            {institution.rating || 0}
                           </span>
                           <span className="text-yellow-500 ml-1">★</span>
                         </div>
                         <span className="text-xs text-gray-500">
-                          ({institution.totalRatings})
+                          ({institution.total_ratings || 0})
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 line-clamp-2">
@@ -209,7 +243,7 @@ function App() {
                 </div>
               ))}
 
-              {filteredInstitutions.length === 0 && (
+              {filteredInstitutions.length === 0 && !loading && (
                 <div className="text-center py-8 text-gray-500">
                   <p>Nenhuma instituição encontrada</p>
                   <p className="text-sm">Tente ajustar os filtros de busca</p>
@@ -223,7 +257,7 @@ function App() {
         <div className="flex-1 relative min-h-96 lg:min-h-0">
           <div className="absolute inset-0">
             <MapComponent
-              filteredInstitutions={filteredInstitutions}
+              filters={filters}
               onInstitutionSelect={handleInstitutionSelect}
             />
           </div>
@@ -241,6 +275,7 @@ function App() {
         onClose={() => setShowFilters(false)}
         filters={filters}
         onFiltersChange={setFilters}
+        categories={categories}
       />
 
       <InstitutionDetailModal

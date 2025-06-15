@@ -123,11 +123,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
 
   const getInstitutionTypeLabel = (type: string) => {
     const types = {
-      ong: 'ONG',
+      ngo: 'ONG',
       church: 'Igreja',
-      social_project: 'Projeto Social',
-      hospital: 'Hospital',
-      school: 'Escola'
+      charity: 'Caridade',
+      school: 'Escola',
+      community_center: 'Centro Comunitário',
+      other: 'Outro'
     };
     return types[type as keyof typeof types] || type;
   };
@@ -160,7 +161,10 @@ const MapComponent: React.FC<MapComponentProps> = ({
         <LocationMarker />
         
         {institutions.map((institution) => {
-          const address = institution.addresses[0];
+          const addresses = institution.users.addresses;
+          if (!addresses?.length) return null;
+          
+          const address = addresses[0];
           if (!address?.latitude || !address?.longitude) return null;
 
           return (
@@ -174,12 +178,12 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   <div className="flex items-start space-x-3 mb-3">
                     <img
                       src={institution.users.avatar_url || 'https://images.pexels.com/photos/6646918/pexels-photo-6646918.jpeg?auto=compress&cs=tinysrgb&w=100'}
-                      alt={institution.users.name}
+                      alt={institution.users.full_name}
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900 text-sm leading-tight">
-                        {institution.users.name}
+                        {institution.users.full_name}
                       </h3>
                       <p className="text-xs text-green-600 mt-1">
                         {getInstitutionTypeLabel(institution.institution_type)}
@@ -190,8 +194,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
                   <div className="space-y-2 mb-3">
                     <div className="flex items-center space-x-2 text-xs">
                       <Star className="w-3 h-3 text-yellow-500 fill-current" />
-                      <span className="font-medium">{institution.rating || 0}</span>
-                      <span className="text-gray-500">({institution.total_ratings || 0} avaliações)</span>
+                      <span className="font-medium">{institution.average_rating || 0}</span>
+                      <span className="text-gray-500">({institution.total_donations || 0} doações)</span>
                     </div>
 
                     <div className="flex items-center space-x-2 text-xs text-gray-600">

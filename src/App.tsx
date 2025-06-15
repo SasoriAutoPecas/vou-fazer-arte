@@ -76,9 +76,9 @@ function App() {
     // Search filter
     if (searchQuery) {
       filtered = filtered.filter(institution =>
-        institution.users.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institution.addresses[0]?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        institution.addresses[0]?.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
+        institution.users.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        institution.users.addresses[0]?.city.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        institution.users.addresses[0]?.neighborhood.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -86,7 +86,7 @@ function App() {
     if (filters.categories.length > 0) {
       filtered = filtered.filter(institution =>
         institution.institution_categories.some((ic: any) => 
-          filters.categories.includes(ic.categories.id)
+          filters.categories.includes(ic.donation_categories.id)
         )
       );
     }
@@ -101,7 +101,7 @@ function App() {
     // Rating filter
     if (filters.minRating > 0) {
       filtered = filtered.filter(institution =>
-        (institution.rating || 0) >= filters.minRating
+        (institution.average_rating || 0) >= filters.minRating
       );
     }
 
@@ -209,30 +209,30 @@ function App() {
                   <div className="flex items-start space-x-3">
                     <img
                       src={institution.users.avatar_url || 'https://images.pexels.com/photos/6646918/pexels-photo-6646918.jpeg?auto=compress&cs=tinysrgb&w=100'}
-                      alt={institution.users.name}
+                      alt={institution.users.full_name}
                       className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
                     />
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium text-gray-900 truncate">
-                        {institution.users.name}
+                        {institution.users.full_name}
                       </h3>
                       <p className="text-sm text-green-600 mb-1">
-                        {institution.institution_type === 'ong' ? 'ONG' : 
+                        {institution.institution_type === 'ngo' ? 'ONG' : 
                          institution.institution_type === 'church' ? 'Igreja' :
-                         institution.institution_type === 'social_project' ? 'Projeto Social' :
-                         institution.institution_type === 'hospital' ? 'Hospital' :
+                         institution.institution_type === 'charity' ? 'Caridade' :
                          institution.institution_type === 'school' ? 'Escola' :
+                         institution.institution_type === 'community_center' ? 'Centro Comunitário' :
                          institution.institution_type}
                       </p>
                       <div className="flex items-center space-x-2 mb-2">
                         <div className="flex items-center">
                           <span className="text-sm font-medium text-gray-700">
-                            {institution.rating || 0}
+                            {institution.average_rating || 0}
                           </span>
                           <span className="text-yellow-500 ml-1">★</span>
                         </div>
                         <span className="text-xs text-gray-500">
-                          ({institution.total_ratings || 0})
+                          ({institution.total_donations || 0})
                         </span>
                       </div>
                       <p className="text-xs text-gray-600 line-clamp-2">

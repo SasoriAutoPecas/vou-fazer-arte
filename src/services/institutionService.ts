@@ -1,6 +1,16 @@
 import { supabase } from '../lib/supabase';
 import { Database } from '../lib/database.types';
 
+type InstitutionQueryResult = Database['public']['Tables']['institutions']['Row'] & {
+  users: Database['public']['Tables']['users']['Row'] & {
+    addresses: Database['public']['Tables']['addresses']['Row'][];
+  };
+  working_hours: Database['public']['Tables']['working_hours']['Row'][];
+  institution_categories: {
+    categories: Database['public']['Tables']['categories']['Row'];
+  }[];
+};
+
 type InstitutionWithDetails = Database['public']['Tables']['institutions']['Row'] & {
   users: Database['public']['Tables']['users']['Row'];
   addresses: Database['public']['Tables']['addresses']['Row'][];
@@ -9,6 +19,19 @@ type InstitutionWithDetails = Database['public']['Tables']['institutions']['Row'
     categories: Database['public']['Tables']['categories']['Row'];
   }[];
 };
+
+// Transform function to flatten the nested structure
+function transformInstitutionData(institution: InstitutionQueryResult): InstitutionWithDetails {
+  return {
+    ...institution,
+    addresses: institution.users.addresses || [],
+    users: {
+      ...institution.users,
+      // Remove addresses from users object to avoid duplication
+      addresses: undefined as any
+    }
+  };
+}
 
 export const institutionService = {
   async getInstitutions(filters?: {
@@ -22,8 +45,10 @@ export const institutionService = {
       .from('institutions')
       .select(`
         *,
-        users!inner(*),
-        addresses!inner(*),
+        users!inner(
+          *,
+          addresses(*)
+        ),
         working_hours(*),
         institution_categories(
           categories(*)
@@ -36,13 +61,13 @@ export const institutionService = {
     }
 
     if (filters?.minRating) {
-      query = query.gte('rating', filters.minRating);
+      query = query.gte('average_rating', filters.minRating);
     }
 
     const { data, error } = await query;
     if (error) throw error;
 
-    let institutions = data as InstitutionWithDetails[];
+    let institutions = (data as InstitutionQueryResult[]).map(transformInstitutionData);
 
     // Filtrar por categorias se especificado
     if (filters?.categories?.length) {
@@ -62,8 +87,8 @@ export const institutionService = {
         const distance = calculateDistance(
           filters.userLocation![0],
           filters.userLocation![1],
-          address.latitude,
-          address.longitude
+          Number(address.latitude),
+          Number(address.longitude)
         );
 
         return distance <= filters.maxDistance!;
@@ -78,22 +103,35 @@ export const institutionService = {
       .from('institutions')
       .select(`
         *,
-        users(*),
-        addresses(*),
+        users(
+          *,
+          addresses(*)
+        ),
         working_hours(*),
         institution_categories(
           categories(*)
         ),
-        ratings(
+        reviews(
           *,
-          users(name, avatar_url)
+          users(full_name, avatar_url)
         )
       `)
       .eq('id', id)
       .single();
 
     if (error) throw error;
-    return data;
+    
+    // Transform the data structure for single institution
+    const transformedData = {
+      ...data,
+      addresses: data.users?.addresses || [],
+      users: {
+        ...data.users,
+        addresses: undefined as any
+      }
+    };
+    
+    return transformedData;
   },
 
   async updateInstitution(id: string, updates: Partial<Database['public']['Tables']['institutions']['Update']>) {
